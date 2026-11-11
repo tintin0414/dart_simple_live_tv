@@ -1,0 +1,46 @@
+name: Build TV APK
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+          cache: 'gradle'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.38.x'
+          cache: true
+
+      - name: Generate Keystore and Configure
+        run: |
+          cd simple_live_tv_app/android
+          # 直接在 app 目录下生成签名
+          keytool -genkeypair -v -keystore app/release.jks -keyalg RSA -keysize 2048 -validity 10000 -alias release -storepass 123456 -keypass 123456 -dname "CN=Android Debug,O=Android,C=US"
+          # 写入配置文件
+          echo "storePassword=123456" > key.properties
+          echo "keyPassword=123456" >> key.properties
+          echo "keyAlias=release" >> key.properties
+          echo "storeFile=release.jks" >> key.properties
+
+      - name: Build TV APK
+        run: |
+          cd simple_live_tv_app
+          flutter pub get
+          flutter build apk --release --split-per-abi
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: tv-apk
+          path: simple_live_tv_app/build/app/outputs/flutter-apk/*.apk
